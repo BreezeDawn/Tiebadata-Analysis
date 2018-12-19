@@ -45,17 +45,10 @@ class Article(Base):
     reply_num = Column(String(64))  # 带楼中楼的评论量
     create_time = Column(String(64))  # 创建时间
     user_id = Column(Integer, ForeignKey('users.id'))  # 作者
+    replys = relationship('Reply', backref='article')  # 发表的帖子
 
     def __repr__(self):
         return '%s(%r)' % (self.__class__.__name__, self.title)
-
-
-# 帖子和评论的多对多关系表
-article_reply = Table(
-    'article_reply', Base.metadata,
-    Column('article_id', Integer, ForeignKey('articles.id')),
-    Column('reply_id', Integer, ForeignKey('replys.id'))
-)
 
 
 class Reply(Base):
@@ -70,6 +63,7 @@ class Reply(Base):
     content = Column(Text())  # 评论内容
     create_time = Column(String(64))  # 评论时间
     user_id = Column(Integer, ForeignKey('users.id'))  # 评论用户
+    article_id = Column(Integer, ForeignKey('articles.id'))  # 评论所属文章
 
     def __repr__(self):
         return '%s(%r)' % (self.__class__.__name__, self.tid)

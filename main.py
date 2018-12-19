@@ -25,7 +25,7 @@ from models import User, Article, Reply
 logging = Logger('./logging.log', level='debug')
 
 
-class Tiebadata:
+class TiebaData:
     def __init__(self):
         self.url = "http://tieba.baidu.com/f?kw={kw}&ie=utf-8&pn={{}}"
         self.detail_url = 'https://tieba.baidu.com/p/{}?pn={}'
@@ -96,8 +96,8 @@ class Tiebadata:
             tid = article[0]
             title = article[1]
             reply_num = article[2]
-            self.article_data(tid, title, reply_num)
-            self.reply_data(tid)
+            article_id = self.article_data(tid, title, reply_num)
+            self.reply_data(article_id, tid)
 
     def article_data(self, tid, title, reply_num):
         # 构造请求链接
@@ -132,7 +132,9 @@ class Tiebadata:
         if ('-' not in article_create_time) and (':' not in article_create_time):
             article_create_time = li.xpath(".//div[@class='list_item_top_name']//span[4]/text()")[0]
         # 存储帖子数据
-        self.save_article_data(article_tid, article_title, article_create_time, author_name, article_reply_num)
+        article_id = self.save_article_data(article_tid, article_title, article_create_time, author_name,
+                                            article_reply_num)
+        return article_id
 
     def save_user_data(self, username, avatar_url, level):
         # 查询用户是否已存在
@@ -178,11 +180,12 @@ class Tiebadata:
         try:
             self.engine_session.commit()
             logging.logger.info('文章: Tid-%s 存储成功' % article.tid)
+            return article.id
         except BaseException as e:
             logging.logger.error('文章: Tid-%s 存储失败,失败原因 %s ' % (article.tid, e))
             return
 
-    def reply_data(self, tid):
+    def reply_data(self, article_id, tid):
         num = 0
         prev_last = ''
         while True:
@@ -225,26 +228,27 @@ class Tiebadata:
                 if reply_content == ' ':
                     reply_content = '这是一个纯表情或者图片评论导致无法获取,可是有点水哦~'
                 # 存储评论
-                self.save_reply_data(reply_tid, reply_create_time, reply_content, user_name)
+                self.save_reply_data(article_id, reply_tid, reply_create_time, reply_content, user_name)
 
             # 页数变更
             num += 30
 
-    def save_reply_data(self, tid, create_time, content, username):
+    def save_reply_data(self, article_id, reply_tid, create_time, content, username):
         # 查询评论是否已存在
-        reply = self.engine_session.query(Reply).filter_by(tid=tid).first()
+        reply = self.engine_session.query(Reply).filter_by(tid=reply_tid).first()
         if reply:
             logging.logger.warning('评论: Tid-%s 已存在,不必再次存储' % reply.tid)
             return
 
         # 创建评论
         reply = Reply()
-        reply.tid = tid
+        reply.tid = reply_tid
         reply.content = content
         reply.create_time = create_time
         # 因为存储评论前事先保存了评论的用户,所以直接查询拿取评论id
         user = self.engine_session.query(User).filter_by(username=username).first()
         reply.user_id = user.id
+        reply.article_id = article_id
 
         # 存储评论
         self.engine_session.add(reply)
@@ -276,7 +280,10 @@ class Tiebadata:
         return engine_session()
 
 
+class TiebaAnalysis:
+    pass
+
+
 if __name__ == '__main__':
-    tieba = Tiebadata()
+    tieba = TiebaData()
     tieba.run()
-    # tieba.reply_data(5913830082)
